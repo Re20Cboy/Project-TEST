@@ -1,119 +1,98 @@
 import Link from 'next/link'
-import useSWR from 'swr'
-import { Auth, Card, Typography, Space, Button, Icon } from '@supabase/ui'
-import { supabase } from '../lib/initSupabase'
-import { useEffect, useState } from 'react'
+import { useRouter } from 'next/router'
 
-const fetcher = ([url, token]) =>
-  fetch(url, {
-    method: 'GET',
-    headers: new Headers({ 'Content-Type': 'application/json', token }),
-    credentials: 'same-origin',
-  }).then((res) => res.json())
+import { useEffect, useState } from 'react';
+import { supabase } from '../lib/initSupabase';
 
-const Index = () => {
-  const { user, session } = Auth.useUser()
-  const { data, error } = useSWR(
-    session ? ['/api/getUser', session.access_token] : null,
-    fetcher
-  )
-  const [authView, setAuthView] = useState('sign_in')
-
-  useEffect(() => {
-    const { data: authListener } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        if (event === 'PASSWORD_RECOVERY') setAuthView('update_password')
-        if (event === 'USER_UPDATED')
-          setTimeout(() => setAuthView('sign_in'), 1000)
-        // Send session to /api/auth route to set the auth cookie.
-        // NOTE: this is only needed if you're doing SSR (getServerSideProps)!
-        fetch('/api/auth', {
-          method: 'POST',
-          headers: new Headers({ 'Content-Type': 'application/json' }),
-          credentials: 'same-origin',
-          body: JSON.stringify({ event, session }),
-        }).then((res) => res.json())
-      }
-    )
-
-    return () => {
-      authListener.unsubscribe()
-    }
-  }, [])
-
-  const View = () => {
-    if (!user)
-      return (
-        <Space direction="vertical" size={8}>
-          <div>
-            <img
-              src="https://app.supabase.io/img/supabase-dark.svg"
-              width="96"
-            />
-            <Typography.Title level={3}>
-              Welcome to Supabase Auth
-            </Typography.Title>
-          </div>
-          <Auth
-            supabaseClient={supabase}
-            providers={['google', 'github']}
-            view={authView}
-            socialLayout="horizontal"
-            socialButtonSize="xlarge"
-          />
-        </Space>
-      )
-
-    return (
-      <Space direction="vertical" size={6}>
-        {authView === 'update_password' && (
-          <Auth.UpdatePassword supabaseClient={supabase} />
-        )}
-        {user && (
-          <>
-            <Typography.Text>You're signed in</Typography.Text>
-            <Typography.Text strong>Email: {user.email}</Typography.Text>
-
-            <Button
-              icon={<Icon type="LogOut" />}
-              type="outline"
-              onClick={() => supabase.auth.signOut()}
-            >
-              Log out
-            </Button>
-            {error && (
-              <Typography.Text danger>Failed to fetch user!</Typography.Text>
-            )}
-            {data && !error ? (
-              <>
-                <Typography.Text type="success">
-                  User data retrieved server-side (in API route):
-                </Typography.Text>
-
-                <Typography.Text>
-                  <pre>{JSON.stringify(data, null, 2)}</pre>
-                </Typography.Text>
-              </>
-            ) : (
-              <div>Loading...</div>
-            )}
-
-            <Typography.Text>
-              <Link href="/profile">SSR example with getServerSideProps</Link>
-            </Typography.Text>
-          </>
-        )}
-      </Space>
-    )
+export async function getServerSideProps({ query }) {
+  const { auth } = query
+  if (auth) {
+    const { error } = await supabase.auth.recoverSession(auth)
+    if (error) return { props: {} }
+    const { data: user, error: userError } = await supabase.auth.api.getUser(auth)
+    if (userError) return { props: {} }
+    return { props: { user } }
   }
+  return { props: {} }
+}
 
+
+
+
+
+
+function Home() {
+  const router = useRouter();
+  const [likes, setLikes] = useState({});
+  const [favorites, setFavorites] = useState({});
+  
+  const [users, setUsers] = useState([]);
+  const imgSrc = "/img/testimg1.jpg";
+
+const Index = ({ user }) => {
   return (
-    <div style={{ maxWidth: '420px', margin: '96px auto' }}>
-      <Card>
-        <View />
-      </Card>
+    <div>
+      {user ? (
+        <div>
+          <p>Logged in as: {user.email}</p>
+        </div>
+      ) : (
+        <div>
+          <p>Not logged in</p>
+        </div>
+      )}
     </div>
   )
 }
+  
+  const handleLike = (id) => {
+    setLikes((prevLikes) => ({ ...prevLikes, [id]: (prevLikes[id] || 0) + 1 }));
+  };
 
-export default Index
+  const handleFavorite = (id) => {
+    setFavorites((prevFavorites) => ({ ...prevFavorites, [id]: !prevFavorites[id] }));
+  };
+//
+  const [showUsers, setShowUsers] = useState(false);
+
+  return (
+    <div>
+      <button onClick={() => router.push('/signin')}>
+        用户登录
+      </button>
+      
+      <h1>欢迎来到我的门户网站！</h1>
+      <p>探索并享受我们提供的所有功能。</p>
+
+      <div>
+        <img src={imgSrc} alt="testimg1" />
+        <div>
+          <button onClick={() => handleLike(1)}>赞 {likes[1] || 0}</button>
+          <button onClick={() => handleFavorite(1)}>
+            {favorites[1] ? "取消收藏" : "收藏"}
+          </button>
+          <button>
+            <a href={imgSrc} download>下载</a>
+          </button>
+        </div>
+      </div>
+      <button onClick={() => setShowUsers(!showUsers)}>查看用户</button>
+      {showUsers && (
+        <div>
+          <h2>已注册用户：</h2>
+          {users.length > 0 ? (
+            <ul>
+              {users.map((user) => (
+                <li key={user.username}>{user.username}</li>
+              ))}
+            </ul>
+          ) : (
+            <p>无任何已注册用户！</p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default Home;
