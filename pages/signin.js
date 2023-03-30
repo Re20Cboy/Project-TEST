@@ -3,21 +3,7 @@ import useSWR from 'swr'
 import { Auth, Card, Typography, Space, Button, Icon } from '@supabase/ui'
 import { supabase } from '../lib/initSupabase'
 import { useEffect, useState } from 'react'
-
-//保证用户登录状态
-const handleRedirect = async () => {
-  const { error, data } = await supabase.auth.session()
-  if (error) {
-    console.error(error)
-    // 提示用户登录或重新登录
-  } else if (!data) {
-    // 提示用户登录或重新登录
-    console.log(data) // Add this line
-  } else {
-    window.location.href = `/index.js?auth=${data.access_token}`
-  }
-}
-
+import { useRouter } from 'next/router'
 
 const fetcher = ([url, token]) =>
   fetch(url, {
@@ -33,6 +19,14 @@ const Index = () => {
     fetcher
   )
   const [authView, setAuthView] = useState('sign_in')
+  const router = useRouter()
+
+  const handleRedirect = () => {
+    router.push({
+      pathname: '/',
+      query: { token: session.access_token },
+    })
+  }
 
   useEffect(() => {
     const { data: authListener } = supabase.auth.onAuthStateChange(
@@ -88,9 +82,8 @@ const Index = () => {
           <>
             <Typography.Text>You're signed in</Typography.Text>
             <Typography.Text strong>Email: {user.email}</Typography.Text>
-            
-      <Button onClick={handleRedirect}>跳转</Button>
-      
+            <Button onClick={handleRedirect}>跳转</Button>
+        
             <Button
               icon={<Icon type="LogOut" />}
               type="outline"
